@@ -184,6 +184,12 @@ function ease_smoother_step(t)
 	return t * t * t * (t * (t * 6 - 15) + 10)
 end
 
+function ease_reset_pullback(t)
+	local eased = ease_smoother_step(t)
+	local settle = math.sin(t * math.pi) * 0.025 * (1.0 - t)
+	return clamp(eased + settle, 0.0, 1.0)
+end
+
 function ease_screen_studio_zoom(t)
 	local c1 = 0.42
 	local c3 = c1 + 1.0
@@ -1308,12 +1314,12 @@ function click_reset_tick()
 		local id = tostring(obs.obs_sceneitem_get_id(item))
 		local original = saved_transforms[id]
 		if original ~= nil then
-			local reset_duration = math.max(settings_state.zoom_duration_ms or 0, 700)
+			local reset_duration = math.max(settings_state.zoom_duration_ms or 0, 900)
 			enqueue_animation(item, original, reset_duration, "reset")
 			write_live_status("Idle Reset", last_pointer_state_x or 0, last_pointer_state_y or 0, 1.0, original)
 			print("[Screen Studio Lite] Idle Reset after " .. tostring(idle_ms) .. " ms without pointer movement.")
 			obs.timer_remove(restore_frame_layer_tick)
-			obs.timer_add(restore_frame_layer_tick, reset_duration)
+			obs.timer_add(restore_frame_layer_tick, math.max(520, math.floor(reset_duration * 0.72)))
 		else
 			set_frame_layer_visible(false)
 		end
@@ -1333,7 +1339,7 @@ function animation_tick()
 		if anim.easing == "screen-studio" then
 			eased = ease_screen_studio_zoom(progress)
 		elseif anim.easing == "reset" then
-			eased = ease_smoother_step(progress)
+			eased = ease_reset_pullback(progress)
 		else
 			eased = ease_out_cubic(progress)
 		end
@@ -1437,9 +1443,10 @@ function reset_selected()
 	local original = saved_transforms[id]
 
 	if original ~= nil then
-		enqueue_animation(item, original)
+		local reset_duration = math.max(settings_state.zoom_duration_ms or 0, 900)
+		enqueue_animation(item, original, reset_duration, "reset")
 		obs.timer_remove(restore_frame_layer_tick)
-		obs.timer_add(restore_frame_layer_tick, math.max(settings_state.zoom_duration_ms or 0, 520))
+		obs.timer_add(restore_frame_layer_tick, math.max(520, math.floor(reset_duration * 0.72)))
 	else
 		local current = current_transform(item)
 		if current ~= nil then
@@ -1451,9 +1458,10 @@ function reset_selected()
 			current.bounds_x = 0
 			current.bounds_y = 0
 			current.crop_to_bounds = false
-			enqueue_animation(item, current)
+			local reset_duration = math.max(settings_state.zoom_duration_ms or 0, 900)
+			enqueue_animation(item, current, reset_duration, "reset")
 			obs.timer_remove(restore_frame_layer_tick)
-			obs.timer_add(restore_frame_layer_tick, math.max(settings_state.zoom_duration_ms or 0, 520))
+			obs.timer_add(restore_frame_layer_tick, math.max(520, math.floor(reset_duration * 0.72)))
 		end
 	end
 
