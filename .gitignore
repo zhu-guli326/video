@@ -1,0 +1,12 @@
+*.bak
+*.bak-*
+*.codex-bak-*
+*.log
+click-state.txt
+live-status.json
+studio-project.json
+studio-timeline.json
+studio-timeline.md
+export-video.ps1
+export-video.cmd
+scripts/screen-studio-lite/masks/dynamic-*.png

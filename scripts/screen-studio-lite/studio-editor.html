@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Screen Studio Lite Editor</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #f5f7fb;
+      color: #151820;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+    }
+
+    main {
+      padding: 32px;
+      display: grid;
+      gap: 24px;
+      align-content: start;
+    }
+
+    aside {
+      border-left: 1px solid #dce1ea;
+      background: #ffffff;
+      padding: 28px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+
+    .subtle {
+      margin: 8px 0 0;
+      color: #687084;
+      font-size: 14px;
+    }
+
+    .file-picker {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      border: 1px solid #cfd8e6;
+      background: #fff;
+      color: #151820;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .file-picker input {
+      display: none;
+    }
+
+    .project-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .project-field,
+    .timeline-wrap,
+    .empty {
+      border: 1px solid #dbe2ed;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .project-field {
+      min-width: 0;
+      padding: 14px;
+    }
+
+    .project-field strong {
+      display: block;
+      color: #687084;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    .project-field span {
+      display: block;
+      margin-top: 8px;
+      font: 13px/1.35 Consolas, "SFMono-Regular", monospace;
+      overflow-wrap: anywhere;
+    }
+
+    .preview {
+      --preview-ratio: 0.75;
+      --preview-aspect: 2160 / 2880;
+      width: min(100%, calc(46vh * var(--preview-ratio)));
+      aspect-ratio: var(--preview-aspect);
+      justify-self: center;
+      border: 1px solid #dbe2ed;
+      border-radius: 8px;
+      background:
+        radial-gradient(circle at 16% 18%, rgba(45, 212, 191, 0.22), transparent 27%),
+        radial-gradient(circle at 82% 22%, rgba(247, 201, 72, 0.16), transparent 23%),
+        linear-gradient(135deg, #101722, #25213b 48%, #1d2e2c);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(22, 28, 45, 0.12);
+    }
+
+    .card {
+      position: absolute;
+      inset: 8.5%;
+      border-radius: 34px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(12, 16, 22, 0.58);
+      box-shadow: 0 36px 120px rgba(0, 0, 0, 0.32);
+    }
+
+    .focus {
+      position: absolute;
+      width: 84px;
+      height: 84px;
+      margin: -42px 0 0 -42px;
+      left: 50%;
+      top: 50%;
+      border-radius: 999px;
+      border: 3px solid rgba(255, 255, 255, 0.92);
+      box-shadow: 0 0 0 18px rgba(20, 184, 166, 0.22);
+      opacity: 0;
+      transform: scale(0.86);
+      transition: opacity 160ms ease, transform 160ms ease, left 220ms ease, top 220ms ease;
+    }
+
+    .focus.is-visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .timeline-wrap {
+      padding: 18px;
+    }
+
+    .ruler {
+      height: 24px;
+      display: flex;
+      justify-content: space-between;
+      color: #7a8395;
+      font-size: 12px;
+      padding: 0 4px;
+    }
+
+    .track {
+      position: relative;
+      height: 96px;
+      border-radius: 6px;
+      background:
+        linear-gradient(90deg, rgba(21, 24, 32, 0.07) 1px, transparent 1px),
+        #eef2f8;
+      background-size: 80px 100%;
+      overflow: hidden;
+    }
+
+    .block {
+      position: absolute;
+      top: 20px;
+      height: 54px;
+      min-width: 8px;
+      border-radius: 6px;
+      background: #14b8a6;
+      color: #fff;
+      border: 0;
+      padding: 0 12px;
+      font: 700 13px/54px Inter, "Segoe UI", Arial, sans-serif;
+      text-align: left;
+      cursor: pointer;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .block.event {
+      width: 10px;
+      min-width: 10px;
+      padding: 0;
+      background: #8b5cf6;
+    }
+
+    .block.is-selected {
+      outline: 3px solid rgba(20, 184, 166, 0.26);
+      outline-offset: 2px;
+    }
+
+    .events {
+      display: grid;
+      gap: 10px;
+    }
+
+    .event-row {
+      width: 100%;
+      border: 1px solid #dde4ef;
+      border-radius: 8px;
+      background: #fff;
+      color: #151820;
+      padding: 12px 14px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .event-row strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .event-row span {
+      display: block;
+      margin-top: 4px;
+      color: #687084;
+      font-size: 12px;
+    }
+
+    label {
+      display: block;
+      margin-top: 18px;
+      color: #687084;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      margin-top: 8px;
+      border: 1px solid #dbe2ed;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font: 14px/1.4 Inter, "Segoe UI", Arial, sans-serif;
+      color: #151820;
+      background: #fff;
+    }
+
+    textarea {
+      min-height: 150px;
+      resize: vertical;
+    }
+
+    .empty {
+      padding: 24px;
+      color: #687084;
+    }
+
+    @media (max-width: 900px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        border-left: 0;
+        border-top: 1px solid #dce1ea;
+      }
+
+      .project-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <main>
+      <header>
+        <h1>Screen Studio Lite Editor</h1>
+        <p class="subtle" id="meta">Loading project...</p>
+        <label class="file-picker">
+          Load project or timeline JSON
+          <input id="fileInput" type="file" accept="application/json,.json">
+        </label>
+      </header>
+
+      <section class="project-grid">
+        <div class="project-field">
+          <strong>Recording</strong>
+          <span id="recordingPath">Waiting for a recording...</span>
+        </div>
+        <div class="project-field">
+          <strong>Export</strong>
+          <span id="exportSpec">3:4 Portrait / 2160x2880 / 60 fps / mp4</span>
+        </div>
+        <div class="project-field">
+          <strong>Script</strong>
+          <span id="exportScript">export-video.ps1</span>
+        </div>
+      </section>
+
+      <section class="preview">
+        <div class="card"></div>
+        <div class="focus" id="focus"></div>
+      </section>
+
+      <section class="timeline-wrap">
+        <div class="ruler" id="ruler"></div>
+        <div class="track" id="track"></div>
+      </section>
+
+      <section class="events" id="events"></section>
+    </main>
+
+    <aside>
+      <h1>Block</h1>
+      <p class="subtle">Select a timeline block to inspect its zoom, cut, and export metadata.</p>
+
+      <label>Type</label>
+      <input id="type" readonly>
+
+      <label>Offset</label>
+      <input id="offset" readonly>
+
+      <label>Zoom</label>
+      <input id="zoom" readonly>
+
+      <label>Focus</label>
+      <input id="focusField" readonly>
+
+      <label>Details</label>
+      <textarea id="details" readonly></textarea>
+    </aside>
+  </div>
+
+  <script>
+    const projectUrl = "studio-project.json?v=";
+    const timelineUrl = "studio-timeline.json?v=";
+    const track = document.getElementById("track");
+    const eventsEl = document.getElementById("events");
+    const ruler = document.getElementById("ruler");
+    const meta = document.getElementById("meta");
+    const focus = document.getElementById("focus");
+    const preview = document.querySelector(".preview");
+    const fileInput = document.getElementById("fileInput");
+    const recordingPath = document.getElementById("recordingPath");
+    const exportSpec = document.getElementById("exportSpec");
+    const exportScript = document.getElementById("exportScript");
+    const fields = {
+      type: document.getElementById("type"),
+      offset: document.getElementById("offset"),
+      zoom: document.getElementById("zoom"),
+      focus: document.getElementById("focusField"),
+      details: document.getElementById("details")
+    };
+
+    let selectedButton = null;
+    let previewWidth = 2160;
+    let previewHeight = 2880;
+
+    function updatePreviewAspect() {
+      const ratio = previewHeight > 0 ? previewWidth / previewHeight : 0.75;
+      preview.style.setProperty("--preview-ratio", ratio.toFixed(6));
+      preview.style.setProperty("--preview-aspect", `${previewWidth} / ${previewHeight}`);
+    }
+
+    function formatMs(ms) {
+      const seconds = Math.max(0, Math.round(ms / 1000));
+      const minutes = Math.floor(seconds / 60);
+      const rest = String(seconds % 60).padStart(2, "0");
+      return `${minutes}:${rest}`;
+    }
+
+    function isZoom(event) {
+      return /zoom/i.test(event.type || "");
+    }
+
+    function selectEvent(event, button) {
+      if (selectedButton) selectedButton.classList.remove("is-selected");
+      selectedButton = button || null;
+      if (selectedButton) selectedButton.classList.add("is-selected");
+
+      fields.type.value = event.type || "";
+      fields.offset.value = `${formatMs(event.offsetMs || 0)} (${event.offsetMs || 0} ms)`;
+      fields.zoom.value = event.zoom ? `${event.zoom}x` : "";
+      fields.focus.value = Number.isFinite(event.x) && Number.isFinite(event.y) ? `${event.x}, ${event.y}` : "";
+      fields.details.value = JSON.stringify(event, null, 2);
+
+      if (Number.isFinite(event.x) && Number.isFinite(event.y)) {
+        focus.style.left = `${Math.max(8, Math.min(92, event.x / previewWidth * 100))}%`;
+        focus.style.top = `${Math.max(8, Math.min(92, event.y / previewHeight * 100))}%`;
+        focus.classList.add("is-visible");
+      } else {
+        focus.classList.remove("is-visible");
+      }
+    }
+
+    function renderTimeline(data) {
+      const project = data || {};
+      const events = Array.isArray(project.events) ? project.events : [];
+      const maxOffset = Math.max(1000, ...events.map(event => (event.offsetMs || 0) + (event.durationMs || 0)), 10000);
+      const exportInfo = project.export || {};
+      previewWidth = Number(exportInfo.width) || 2160;
+      previewHeight = Number(exportInfo.height) || 2880;
+      updatePreviewAspect();
+
+      meta.textContent = `${project.scene || "Screen Studio Recording"} - ${events.length} timeline events`;
+      recordingPath.textContent = project.recordingPath || "No recording captured yet";
+      exportSpec.textContent = `${exportInfo.label ? `${exportInfo.label} / ` : ""}${previewWidth}x${previewHeight} / ${exportInfo.fps || 60} fps / ${exportInfo.format || "mp4"}`;
+      exportScript.textContent = project.exportScriptPath || "export-video.ps1";
+
+      ruler.innerHTML = "";
+      for (let i = 0; i <= 4; i += 1) {
+        const mark = document.createElement("span");
+        mark.textContent = formatMs(maxOffset * (i / 4));
+        ruler.appendChild(mark);
+      }
+
+      track.innerHTML = "";
+      eventsEl.innerHTML = "";
+
+      if (!events.length) {
+        eventsEl.innerHTML = '<div class="empty">No timeline events yet. Start a Studio Recording, trigger a few zooms, then reopen this editor.</div>';
+        fields.details.value = JSON.stringify(project, null, 2);
+        return;
+      }
+
+      for (const event of events) {
+        const left = Math.max(0, Math.min(99, ((event.offsetMs || 0) / maxOffset) * 100));
+        const duration = isZoom(event) ? Math.max(event.durationMs || 260, 420) : 80;
+        const width = Math.max(0.8, (duration / maxOffset) * 100);
+        const block = document.createElement("button");
+        block.className = `block${isZoom(event) ? "" : " event"}`;
+        block.style.left = `${left}%`;
+        block.style.width = `${width}%`;
+        block.title = `${event.type} - ${formatMs(event.offsetMs || 0)}`;
+        block.textContent = isZoom(event) ? event.type : "";
+        block.addEventListener("click", () => selectEvent(event, block));
+        track.appendChild(block);
+
+        const row = document.createElement("button");
+        row.className = "event-row";
+        row.innerHTML = `<strong>${event.type || "Event"}</strong><span>${formatMs(event.offsetMs || 0)}${event.zoom ? ` - ${event.zoom}x` : ""}</span>`;
+        row.addEventListener("click", () => selectEvent(event, block));
+        eventsEl.appendChild(row);
+      }
+
+      const firstZoom = events.find(isZoom) || events[0];
+      const firstBlock = track.querySelector(".block");
+      selectEvent(firstZoom, firstBlock);
+    }
+
+    async function loadTimeline() {
+      try {
+        let response = await fetch(projectUrl + Date.now(), { cache: "no-store" });
+        if (!response.ok) {
+          response = await fetch(timelineUrl + Date.now(), { cache: "no-store" });
+        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        renderTimeline(await response.json());
+      } catch (error) {
+        meta.textContent = "No project loaded";
+        recordingPath.textContent = "No recording captured yet";
+        previewWidth = 2160;
+        previewHeight = 2880;
+        updatePreviewAspect();
+        exportSpec.textContent = "3:4 Portrait / 2160x2880 / 60 fps / mp4";
+        exportScript.textContent = "export-video.ps1";
+        eventsEl.innerHTML = '<div class="empty">Record once with Start Studio Recording to create studio-project.json.</div>';
+      }
+    }
+
+    fileInput.addEventListener("change", async () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      try {
+        renderTimeline(JSON.parse(await file.text()));
+      } catch (error) {
+        meta.textContent = "Could not parse selected JSON";
+      }
+    });
+
+    loadTimeline();
+  </script>
+</body>
+</html>
