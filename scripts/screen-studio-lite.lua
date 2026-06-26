@@ -3889,6 +3889,7 @@ function script_update(settings)
 	settings_state.studio_exclude_taskbar = obs.obs_data_get_bool(settings, "studio_exclude_taskbar")
 	if obs.obs_data_has_user_value ~= nil and not obs.obs_data_has_user_value(settings, "studio_exclude_taskbar") then
 		settings_state.studio_exclude_taskbar = true
+		obs.obs_data_set_bool(settings, "studio_exclude_taskbar", settings_state.studio_exclude_taskbar)
 	end
 end
 
