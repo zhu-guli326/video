@@ -821,6 +821,7 @@ end
 function restore_frame_layer_tick()
 	obs.timer_remove(restore_frame_layer_tick)
 	zoom_camera_active_until = 0
+	apply_fullscreen_round_mask()
 	set_frame_layer_visible(false)
 end
 
@@ -1798,7 +1799,7 @@ function apply_taskbar_crop_to_zoom_target(state)
 		if fit_item_to_canvas_area ~= nil then
 			fit_item_to_canvas_area(item, true, false)
 		end
-		remove_round_mask_for_scene_item(item)
+		upsert_round_mask_for_scene_item(item)
 		last_taskbar_crop_signature = signature
 		print("[Screen Studio Lite] Taskbar excluded with crop L/T/R/B = " .. tostring(left) .. "/" .. tostring(top) .. "/" .. tostring(right) .. "/" .. tostring(bottom))
 	end
@@ -2788,7 +2789,7 @@ function add_screen_capture()
 		else
 			fit_item_to_canvas(item)
 		end
-		remove_round_mask_for_scene_item(item)
+		upsert_round_mask_for_scene_item(item)
 		obs.obs_sceneitem_set_order(item, obs.OBS_ORDER_MOVE_UP)
 		select_only_scene_item(item)
 		release_item(item)
