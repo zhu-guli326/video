@@ -57,12 +57,12 @@ Auto Zoom controls the source named in `Auto Zoom Target Source Name`. The helpe
 - `Add Window Capture` sets it to `Window Capture`.
 - `Add Area Capture from Crop Values` sets it to `Area Capture`.
 - `Use Selected Source For Auto Zoom` sets it to whichever source is currently selected.
-- `Test 1.8x Zoom Target` verifies that the chosen source visibly scales before you test click zoom.
+- `Test 2x Zoom Target` verifies that the chosen source visibly scales before you test click zoom.
 
 Settings:
 
 - `Auto Zoom Target Source Name`: the exact OBS source that should be zoomed.
-- `Auto Click Zoom Scale`: default is 1.8x for a visible Screen Studio style focus zoom.
+- `Auto Click Zoom Scale`: default is 2.0x for a visible Screen Studio style focus zoom.
 - `Auto Click Reset Delay`: how long before it animates back.
 - `Auto Focus after cursor dwell`: automatically zoom after the cursor stays in one area.
 - `Auto Focus Dwell Time`: how long the cursor must pause before focus zoom.
