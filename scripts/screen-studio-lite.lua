@@ -822,7 +822,7 @@ function restore_frame_layer_tick()
 	obs.timer_remove(restore_frame_layer_tick)
 	zoom_camera_active_until = 0
 	apply_fullscreen_round_mask()
-	set_frame_layer_visible(false)
+	set_frame_layer_visible(true)
 end
 
 canvas_size = function()
@@ -1322,7 +1322,7 @@ function click_reset_tick()
 			obs.timer_remove(restore_frame_layer_tick)
 			obs.timer_add(restore_frame_layer_tick, math.max(520, math.floor(reset_duration * 0.72)))
 		else
-			set_frame_layer_visible(false)
+			set_frame_layer_visible(true)
 		end
 		obs.obs_sceneitem_release(item)
 	end
@@ -1883,7 +1883,7 @@ function follow_zoom_to_pointer(state)
 	if current ~= nil then
 		local blend = 0.24
 		desired.pos_x = current.pos_x + ((desired.pos_x - current.pos_x) * blend)
-		desired.pos_y = current.pos_y
+		desired.pos_y = current.pos_y + ((desired.pos_y - current.pos_y) * blend)
 		desired.scale_x = current.scale_x + ((desired.scale_x - current.scale_x) * blend)
 		desired.scale_y = current.scale_y + ((desired.scale_y - current.scale_y) * blend)
 	end
@@ -2663,7 +2663,7 @@ function add_or_update_visual_layer()
 					obs.obs_sceneitem_set_visible(item, settings_state.visual_layer_cursor)
 				elseif layer.mode == "frame" then
 					fit_item_to_canvas(item)
-					obs.obs_sceneitem_set_visible(item, false)
+					obs.obs_sceneitem_set_visible(item, true)
 				else
 					fit_item_to_canvas(item)
 					obs.obs_sceneitem_set_visible(item, true)
