@@ -52,7 +52,7 @@ local settings_state = {
 	card_width = 1728,
 	card_height = 972,
 	card_color = 0x1F232A,
-	card_margin = 180,
+	card_margin = 0,
 	fixed_bottom_blank_space = 500,
 	capture_vertical_anchor = 0.42,
 	card_source_name = "Screen Studio Card",
@@ -3709,7 +3709,7 @@ function script_defaults(settings)
 	obs.obs_data_set_default_bool(settings, "create_background", true)
 	obs.obs_data_set_default_int(settings, "card_width", 1728)
 	obs.obs_data_set_default_int(settings, "card_height", 972)
-	obs.obs_data_set_default_int(settings, "card_margin", 180)
+	obs.obs_data_set_default_int(settings, "card_margin", 0)
 	obs.obs_data_set_default_int(settings, "fixed_bottom_blank_space", 500)
 	obs.obs_data_set_default_double(settings, "capture_vertical_anchor", 0.42)
 	obs.obs_data_set_default_int(settings, "card_color", 0x1F232A)
@@ -3806,6 +3806,16 @@ function script_update(settings)
 	settings_state.card_width = obs.obs_data_get_int(settings, "card_width")
 	settings_state.card_height = obs.obs_data_get_int(settings, "card_height")
 	settings_state.card_margin = obs.obs_data_get_int(settings, "card_margin")
+	if obs.obs_data_has_user_value ~= nil and not obs.obs_data_has_user_value(settings, "card_margin") then
+		settings_state.card_margin = 0
+		obs.obs_data_set_int(settings, "card_margin", settings_state.card_margin)
+	elseif settings_state.card_margin == 180 then
+		settings_state.card_margin = 0
+		obs.obs_data_set_int(settings, "card_margin", settings_state.card_margin)
+	elseif settings_state.card_margin < 0 then
+		settings_state.card_margin = 0
+		obs.obs_data_set_int(settings, "card_margin", settings_state.card_margin)
+	end
 	settings_state.fixed_bottom_blank_space = obs.obs_data_get_int(settings, "fixed_bottom_blank_space")
 	if obs.obs_data_has_user_value ~= nil and not obs.obs_data_has_user_value(settings, "fixed_bottom_blank_space") then
 		settings_state.fixed_bottom_blank_space = 500

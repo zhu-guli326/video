@@ -8,6 +8,7 @@ background cards, and high-quality OBS recording defaults.
 
 - 3:4 portrait canvas preset: `2160 x 2880`
 - High quality recording profile: 60 FPS, Lanczos scaling, high bitrate NVENC defaults
+- Full-width screen fit by default, so portrait recordings stay as sharp as the canvas allows
 - Click zoom: defaults to `2.0x`
 - Typing zoom: defaults to `2.6x` and follows the text caret
 - Mouse idle reset: returns to fullscreen after 3 seconds without pointer movement
@@ -46,6 +47,7 @@ background cards, and high-quality OBS recording defaults.
 - `Mouse Idle Fullscreen Delay`: `3000 ms`
 - `Fixed Bottom Blank Space`: `500 px`
 - `Capture Vertical Anchor`: `0.42`
+- `Canvas Margin`: `0 px`, keeping fullscreen capture as wide and sharp as the portrait canvas allows
 - `Exclude Windows taskbar from screen capture`: off by default, so fullscreen capture is not cropped
 
 ## Uninstall
