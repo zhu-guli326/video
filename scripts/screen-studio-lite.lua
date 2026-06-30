@@ -53,12 +53,14 @@ local settings_state = {
 	card_height = 972,
 	card_color = 0x1F232A,
 	card_margin = 180,
+	fixed_bottom_blank_space = 500,
+	capture_vertical_anchor = 0.42,
 	card_source_name = "Screen Studio Card",
 	rectangle_source_name = "Rounded Rectangle",
 	click_zoom_enabled = true,
 	click_zoom_scale = 2.0,
 	typing_zoom_scale = 2.6,
-	click_reset_delay_ms = 5000,
+	click_reset_delay_ms = 3000,
 	auto_focus_enabled = false,
 	auto_focus_dwell_ms = 900,
 	auto_focus_move_threshold = 18,
@@ -127,7 +129,7 @@ local settings_state = {
 	studio_use_dedicated_scene = false,
 	studio_auto_setup_on_load = true,
 	studio_auto_start_zoom_on_load = true,
-	studio_exclude_taskbar = true,
+	studio_exclude_taskbar = false,
 }
 
 local animations = {}
@@ -670,6 +672,7 @@ function visual_layer_url(mode)
 		"&cardOpacity=" .. tostring(settings_state.visual_card_opacity) ..
 		"&shadow=" .. tostring(settings_state.visual_shadow_strength) ..
 		"&frameMargin=" .. tostring(settings_state.card_margin) ..
+		"&fixedBottomBlank=" .. tostring(settings_state.fixed_bottom_blank_space) ..
 		"&frameRadius=" .. tostring(frame_radius) ..
 		"&frameScreen=1" ..
 		"&resetDelay=" .. tostring(settings_state.click_reset_delay_ms) ..
@@ -822,7 +825,7 @@ function restore_frame_layer_tick()
 	obs.timer_remove(restore_frame_layer_tick)
 	zoom_camera_active_until = 0
 	apply_fullscreen_round_mask()
-	set_frame_layer_visible(true)
+	set_frame_layer_visible(false)
 end
 
 canvas_size = function()
@@ -841,6 +844,20 @@ preferred_canvas_size = function()
 	end
 
 	return canvas_size()
+end
+
+function layout_canvas_area()
+	local canvas_width, canvas_height = preferred_canvas_size()
+	local bottom_blank = math.max(0, settings_state.fixed_bottom_blank_space or 0)
+	bottom_blank = math.min(bottom_blank, math.max(0, canvas_height - 64))
+	local layout_height = math.max(64, canvas_height - bottom_blank)
+	return 0, 0, canvas_width, layout_height
+end
+
+function capture_layout_y(layout_y, layout_height, target_height)
+	local anchor = clamp(settings_state.capture_vertical_anchor or 0.42, 0.0, 1.0)
+	local centered_y = layout_y + (layout_height * anchor) - ((target_height or 0) * 0.5)
+	return clamp(centered_y, layout_y, layout_y + layout_height - target_height)
 end
 
 function find_selected_scene_item()
@@ -1322,7 +1339,7 @@ function click_reset_tick()
 			obs.timer_remove(restore_frame_layer_tick)
 			obs.timer_add(restore_frame_layer_tick, math.max(520, math.floor(reset_duration * 0.72)))
 		else
-			set_frame_layer_visible(true)
+			set_frame_layer_visible(false)
 		end
 		obs.obs_sceneitem_release(item)
 	end
@@ -1488,27 +1505,32 @@ function base_free_scale_for_zoom(base, source_width, source_height)
 	return math.max(scale, 0.0001)
 end
 
-function clamp_zoom_axis(pos, scaled_size, canvas_size)
+function clamp_zoom_axis(pos, scaled_size, canvas_size, canvas_offset)
+	local offset = canvas_offset or 0
 	if scaled_size <= canvas_size then
-		return clamp(pos, 0, canvas_size - scaled_size)
+		return clamp(pos, offset, offset + canvas_size - scaled_size)
 	end
-	return clamp(pos, canvas_size - scaled_size, 0)
+	return clamp(pos, offset + canvas_size - scaled_size, offset)
+end
+
+function clamp_zoom_y_to_layout(pos, scaled_height, layout_height, layout_y)
+	return clamp_zoom_axis(pos, scaled_height, layout_height, layout_y)
 end
 
 function zoom_transform_for_source_point(base, source_x, source_y, source_width, source_height, base_free_scale, zoom_override)
-	local canvas_width, canvas_height = preferred_canvas_size()
+	local layout_x, layout_y, layout_width, layout_height = layout_canvas_area()
 	local zoom = clamp(zoom_override or settings_state.click_zoom_scale, 1.0, settings_state.max_zoom)
 	local free_scale = base_free_scale or base_free_scale_for_zoom(base, source_width, source_height)
 	local target_scale = free_scale * zoom
 	local scaled_width = math.max(1, source_width or 1) * target_scale
 	local scaled_height = math.max(1, source_height or 1) * target_scale
-	local focus_x = canvas_width * 0.5
-	local focus_y = canvas_height * 0.5
+	local focus_x = layout_x + (layout_width * 0.5)
+	local focus_y = layout_y + (layout_height * 0.5)
 	local pos_x = focus_x - (source_x * target_scale)
 	local pos_y = focus_y - (source_y * target_scale)
 
-	pos_x = clamp_zoom_axis(pos_x, scaled_width, canvas_width)
-	pos_y = clamp_zoom_axis(pos_y, scaled_height, canvas_height)
+	pos_x = clamp_zoom_axis(pos_x, scaled_width, layout_width, layout_x)
+	pos_y = clamp_zoom_y_to_layout(pos_y, scaled_height, layout_height, layout_y)
 
 	return {
 		pos_x = pos_x,
@@ -1638,7 +1660,7 @@ function zoom_from_state_point(state, label, zoom_override)
 	end
 
 	local source_width, source_height = item_size(item)
-	if settings_state.studio_exclude_taskbar
+	if should_exclude_taskbar(state)
 		and settings_state.click_area_mode == "primary"
 		and state.primary_width ~= nil
 		and state.primary_height ~= nil
@@ -1734,6 +1756,17 @@ function taskbar_safe_primary_area(state)
 	return work_x, work_y, work_width, work_height
 end
 
+function foreground_window_is_fullscreen(state)
+	return state ~= nil and tonumber(state.foreground_fullscreen or 0) == 1
+end
+
+function should_exclude_taskbar(state)
+	if foreground_window_is_fullscreen(state) then
+		return false
+	end
+	return settings_state.studio_exclude_taskbar
+end
+
 function apply_taskbar_crop_to_zoom_target(state)
 	if pending_click_reset ~= nil or zoom_camera_active_until > now_ms() then
 		return
@@ -1749,7 +1782,7 @@ function apply_taskbar_crop_to_zoom_target(state)
 		return
 	end
 
-	if not settings_state.studio_exclude_taskbar then
+	if not should_exclude_taskbar(state) then
 		local crop_left, crop_top, crop_right, crop_bottom = scene_item_crop_values(item)
 		if last_taskbar_crop_signature ~= "" or crop_left ~= 0 or crop_top ~= 0 or crop_right ~= 0 or crop_bottom ~= 0 then
 			local crop = obs.obs_sceneitem_crop()
@@ -1761,6 +1794,7 @@ function apply_taskbar_crop_to_zoom_target(state)
 			if fit_item_to_canvas_area ~= nil then
 				fit_item_to_canvas_area(item, true, false)
 			end
+			upsert_round_mask_for_scene_item(item)
 			last_taskbar_crop_signature = ""
 		end
 		release_item(item)
@@ -1820,7 +1854,7 @@ click_capture_area = function(state)
 		return state.virtual_x or 0, state.virtual_y or 0, state.virtual_width or 0, state.virtual_height or 0
 	end
 
-	if settings_state.studio_exclude_taskbar then
+	if should_exclude_taskbar(state) then
 		local safe_x, safe_y, safe_width, safe_height = taskbar_safe_primary_area(state)
 		if safe_x ~= nil then
 			return safe_x, safe_y, safe_width, safe_height
@@ -1853,7 +1887,7 @@ function follow_zoom_to_pointer(state)
 	local point_x = clamp(state.x, area_x, area_x + area_width)
 	local point_y = clamp(state.y, area_y, area_y + area_height)
 	local source_width, source_height = item_size(item)
-	if settings_state.studio_exclude_taskbar
+	if should_exclude_taskbar(state)
 		and settings_state.click_area_mode == "primary"
 		and state.primary_width ~= nil
 		and state.primary_height ~= nil
@@ -2437,24 +2471,24 @@ function make_camera_placeholder_settings()
 end
 
 function camera_overlay_rect()
-	local canvas_width, canvas_height = preferred_canvas_size()
-	local size = math.min(canvas_width, canvas_height) * (settings_state.camera_size_pct / 100.0)
+	local layout_x, layout_y, layout_width, layout_height = layout_canvas_area()
+	local size = math.min(layout_width, layout_height) * (settings_state.camera_size_pct / 100.0)
 	local margin = settings_state.camera_margin
-	local x = canvas_width - size - margin
-	local y = canvas_height - size - margin
+	local x = layout_x + layout_width - size - margin
+	local y = layout_y + layout_height - size - margin
 
 	if settings_state.camera_position == "bottom-left" then
-		x = margin
-		y = canvas_height - size - margin
+		x = layout_x + margin
+		y = layout_y + layout_height - size - margin
 	elseif settings_state.camera_position == "top-right" then
-		x = canvas_width - size - margin
-		y = margin
+		x = layout_x + layout_width - size - margin
+		y = layout_y + margin
 	elseif settings_state.camera_position == "top-left" then
-		x = margin
-		y = margin
+		x = layout_x + margin
+		y = layout_y + margin
 	elseif settings_state.camera_position == "center" then
-		x = (canvas_width - size) * 0.5
-		y = canvas_height - size - margin
+		x = layout_x + ((layout_width - size) * 0.5)
+		y = layout_y + layout_height - size - margin
 	end
 
 	return x, y, size
@@ -2663,7 +2697,7 @@ function add_or_update_visual_layer()
 					obs.obs_sceneitem_set_visible(item, settings_state.visual_layer_cursor)
 				elseif layer.mode == "frame" then
 					fit_item_to_canvas(item)
-					obs.obs_sceneitem_set_visible(item, true)
+					obs.obs_sceneitem_set_visible(item, false)
 				else
 					fit_item_to_canvas(item)
 					obs.obs_sceneitem_set_visible(item, true)
@@ -3137,10 +3171,10 @@ fit_item_to_canvas_area = function(item, preserve_aspect, crop_to_bounds)
 		return
 	end
 
-	local canvas_width, canvas_height = preferred_canvas_size()
+	local layout_x, layout_y, layout_width, layout_height = layout_canvas_area()
 
-	local max_width = math.max(64, canvas_width - (settings_state.card_margin * 2))
-	local max_height = math.max(64, canvas_height - (settings_state.card_margin * 2))
+	local max_width = math.max(64, layout_width - (settings_state.card_margin * 2))
+	local max_height = math.max(64, layout_height - (settings_state.card_margin * 2))
 	local target_width = max_width
 	local target_height = max_height
 	if preserve_aspect then
@@ -3162,8 +3196,8 @@ fit_item_to_canvas_area = function(item, preserve_aspect, crop_to_bounds)
 		return
 	end
 
-	target.pos_x = (canvas_width - target_width) * 0.5
-	target.pos_y = (canvas_height - target_height) * 0.5
+	target.pos_x = layout_x + ((layout_width - target_width) * 0.5)
+	target.pos_y = capture_layout_y(layout_y, layout_height, target_height)
 	target.scale_x = 1.0
 	target.scale_y = 1.0
 	target.alignment = ALIGN_TOP_LEFT
@@ -3600,7 +3634,7 @@ function script_properties()
 	obs.obs_properties_add_bool(props, "click_zoom_enabled", "Enable Click Zoom")
 	obs.obs_properties_add_float_slider(props, "click_zoom_scale", "Auto Click Zoom Scale", 1.0, 5.0, 0.05)
 	obs.obs_properties_add_float_slider(props, "typing_zoom_scale", "Typing Zoom Scale", 1.0, 5.0, 0.05)
-	obs.obs_properties_add_int_slider(props, "click_reset_delay_ms", "Auto Click Reset Delay (ms)", 0, 6000, 50)
+		obs.obs_properties_add_int_slider(props, "click_reset_delay_ms", "Mouse Idle Fullscreen Delay (ms)", 0, 3000, 50)
 	obs.obs_properties_add_bool(props, "auto_focus_enabled", "Auto Focus after cursor dwell")
 	obs.obs_properties_add_int_slider(props, "auto_focus_dwell_ms", "Auto Focus Dwell Time (ms)", 300, 2500, 50)
 	obs.obs_properties_add_int_slider(props, "auto_focus_move_threshold", "Auto Focus Movement Tolerance", 2, 80, 1)
@@ -3636,6 +3670,8 @@ function script_properties()
 	obs.obs_properties_add_int(props, "card_width", "Card Source Width", 64, 7680, 1)
 	obs.obs_properties_add_int(props, "card_height", "Card Source Height", 64, 4320, 1)
 	obs.obs_properties_add_int(props, "card_margin", "Canvas Margin", 0, 1000, 1)
+	obs.obs_properties_add_int(props, "fixed_bottom_blank_space", "Fixed Bottom Blank Space", 0, 3000, 1)
+	obs.obs_properties_add_float_slider(props, "capture_vertical_anchor", "Capture Vertical Anchor", 0.0, 1.0, 0.01)
 	obs.obs_properties_add_color(props, "card_color", "Card Color")
 	obs.obs_properties_add_text(props, "card_source_name", "Card Source Name", obs.OBS_TEXT_DEFAULT)
 	obs.obs_properties_add_text(props, "rectangle_source_name", "Rectangle Source Name", obs.OBS_TEXT_DEFAULT)
@@ -3674,6 +3710,8 @@ function script_defaults(settings)
 	obs.obs_data_set_default_int(settings, "card_width", 1728)
 	obs.obs_data_set_default_int(settings, "card_height", 972)
 	obs.obs_data_set_default_int(settings, "card_margin", 180)
+	obs.obs_data_set_default_int(settings, "fixed_bottom_blank_space", 500)
+	obs.obs_data_set_default_double(settings, "capture_vertical_anchor", 0.42)
 	obs.obs_data_set_default_int(settings, "card_color", 0x1F232A)
 	obs.obs_data_set_default_string(settings, "card_source_name", "Screen Studio Card")
 	obs.obs_data_set_default_string(settings, "rectangle_source_name", "Rounded Rectangle")
@@ -3726,7 +3764,7 @@ function script_defaults(settings)
 	obs.obs_data_set_default_bool(settings, "click_zoom_enabled", true)
 	obs.obs_data_set_default_double(settings, "click_zoom_scale", 2.0)
 	obs.obs_data_set_default_double(settings, "typing_zoom_scale", 2.6)
-	obs.obs_data_set_default_int(settings, "click_reset_delay_ms", 5000)
+		obs.obs_data_set_default_int(settings, "click_reset_delay_ms", 3000)
 	obs.obs_data_set_default_bool(settings, "auto_focus_enabled", false)
 	obs.obs_data_set_default_int(settings, "auto_focus_dwell_ms", 900)
 	obs.obs_data_set_default_int(settings, "auto_focus_move_threshold", 18)
@@ -3749,7 +3787,7 @@ function script_defaults(settings)
 	obs.obs_data_set_default_bool(settings, "studio_auto_apply_4k_profile", true)
 	obs.obs_data_set_default_bool(settings, "studio_auto_setup_on_load", true)
 	obs.obs_data_set_default_bool(settings, "studio_auto_start_zoom_on_load", true)
-	obs.obs_data_set_default_bool(settings, "studio_exclude_taskbar", true)
+	obs.obs_data_set_default_bool(settings, "studio_exclude_taskbar", false)
 	obs.obs_data_set_default_string(settings, "quick_help", "Select a source in preview first. Hotkeys are configured in Settings > Hotkeys after this script is loaded.")
 end
 
@@ -3768,6 +3806,21 @@ function script_update(settings)
 	settings_state.card_width = obs.obs_data_get_int(settings, "card_width")
 	settings_state.card_height = obs.obs_data_get_int(settings, "card_height")
 	settings_state.card_margin = obs.obs_data_get_int(settings, "card_margin")
+	settings_state.fixed_bottom_blank_space = obs.obs_data_get_int(settings, "fixed_bottom_blank_space")
+	if obs.obs_data_has_user_value ~= nil and not obs.obs_data_has_user_value(settings, "fixed_bottom_blank_space") then
+		settings_state.fixed_bottom_blank_space = 500
+		obs.obs_data_set_int(settings, "fixed_bottom_blank_space", settings_state.fixed_bottom_blank_space)
+	elseif settings_state.fixed_bottom_blank_space < 0 then
+		settings_state.fixed_bottom_blank_space = 0
+		obs.obs_data_set_int(settings, "fixed_bottom_blank_space", settings_state.fixed_bottom_blank_space)
+	end
+	settings_state.capture_vertical_anchor = obs.obs_data_get_double(settings, "capture_vertical_anchor")
+	if obs.obs_data_has_user_value ~= nil and not obs.obs_data_has_user_value(settings, "capture_vertical_anchor") then
+		settings_state.capture_vertical_anchor = 0.42
+		obs.obs_data_set_double(settings, "capture_vertical_anchor", settings_state.capture_vertical_anchor)
+	else
+		settings_state.capture_vertical_anchor = clamp(settings_state.capture_vertical_anchor, 0.0, 1.0)
+	end
 	settings_state.card_color = obs.obs_data_get_int(settings, "card_color")
 	settings_state.card_source_name = obs.obs_data_get_string(settings, "card_source_name")
 	settings_state.rectangle_source_name = obs.obs_data_get_string(settings, "rectangle_source_name")
@@ -3852,6 +3905,13 @@ function script_update(settings)
 		obs.obs_data_set_double(settings, "typing_zoom_scale", settings_state.typing_zoom_scale)
 	end
 	settings_state.click_reset_delay_ms = obs.obs_data_get_int(settings, "click_reset_delay_ms")
+	if settings_state.click_reset_delay_ms <= 0 then
+		settings_state.click_reset_delay_ms = 3000
+		obs.obs_data_set_int(settings, "click_reset_delay_ms", settings_state.click_reset_delay_ms)
+	elseif settings_state.click_reset_delay_ms > 3000 then
+		settings_state.click_reset_delay_ms = 3000
+		obs.obs_data_set_int(settings, "click_reset_delay_ms", settings_state.click_reset_delay_ms)
+	end
 	settings_state.auto_focus_enabled = obs.obs_data_get_bool(settings, "auto_focus_enabled")
 	settings_state.auto_focus_dwell_ms = obs.obs_data_get_int(settings, "auto_focus_dwell_ms")
 	settings_state.auto_focus_move_threshold = obs.obs_data_get_int(settings, "auto_focus_move_threshold")
@@ -3897,7 +3957,7 @@ function script_update(settings)
 	end
 	settings_state.studio_exclude_taskbar = obs.obs_data_get_bool(settings, "studio_exclude_taskbar")
 	if obs.obs_data_has_user_value ~= nil and not obs.obs_data_has_user_value(settings, "studio_exclude_taskbar") then
-		settings_state.studio_exclude_taskbar = true
+		settings_state.studio_exclude_taskbar = false
 		obs.obs_data_set_bool(settings, "studio_exclude_taskbar", settings_state.studio_exclude_taskbar)
 	end
 end

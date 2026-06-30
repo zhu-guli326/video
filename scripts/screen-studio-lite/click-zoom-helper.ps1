@@ -34,6 +34,9 @@ public static class ScreenStudioLiteNative
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr processId);
 
     [DllImport("user32.dll")]
+    public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+
+    [DllImport("user32.dll")]
     public static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO guiThreadInfo);
 
     [DllImport("user32.dll")]
@@ -202,6 +205,34 @@ function Write-StateFile {
     }
 }
 
+function Get-ForegroundFullscreen {
+    param(
+        [int]$PrimaryWidth,
+        [int]$PrimaryHeight
+    )
+
+    $foreground = [ScreenStudioLiteNative]::GetForegroundWindow()
+    if ($foreground -eq [IntPtr]::Zero) {
+        return 0
+    }
+
+    $rect = New-Object ScreenStudioLiteNative+RECT
+    if (-not [ScreenStudioLiteNative]::GetWindowRect($foreground, [ref]$rect)) {
+        return 0
+    }
+
+    $tolerance = 2
+    $coversLeft = $rect.Left -le $tolerance
+    $coversTop = $rect.Top -le $tolerance
+    $coversRight = $rect.Right -ge ($PrimaryWidth - $tolerance)
+    $coversBottom = $rect.Bottom -ge ($PrimaryHeight - $tolerance)
+    if ($coversLeft -and $coversTop -and $coversRight -and $coversBottom) {
+        return 1
+    }
+
+    return 0
+}
+
 while (-not (Test-Path -LiteralPath $StopPath)) {
     $point = New-Object ScreenStudioLiteNative+POINT
     [ScreenStudioLiteNative]::GetCursorPos([ref]$point) | Out-Null
@@ -240,6 +271,7 @@ while (-not (Test-Path -LiteralPath $StopPath)) {
     $virtualHeight = [ScreenStudioLiteNative]::GetSystemMetrics(79)
     $primaryWidth = [ScreenStudioLiteNative]::GetSystemMetrics(0)
     $primaryHeight = [ScreenStudioLiteNative]::GetSystemMetrics(1)
+    $foregroundFullscreen = Get-ForegroundFullscreen -PrimaryWidth $primaryWidth -PrimaryHeight $primaryHeight
     $workRect = New-Object ScreenStudioLiteNative+RECT
     [ScreenStudioLiteNative]::SystemParametersInfo(0x0030, 0, [ref]$workRect, 0) | Out-Null
     $workWidth = [Math]::Max(0, $workRect.Right - $workRect.Left)
@@ -254,6 +286,7 @@ y=$($point.Y)
 time=$timestamp
 primary_width=$primaryWidth
 primary_height=$primaryHeight
+foreground_fullscreen=$foregroundFullscreen
 work_x=$($workRect.Left)
 work_y=$($workRect.Top)
 work_width=$workWidth

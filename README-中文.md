@@ -8,8 +8,11 @@
 - 高清录制：60 FPS、Lanczos 缩放、高码率 NVENC 默认配置
 - 点击放大：默认 `2.0x`
 - 打字放大：默认 `2.6x`，会跟随输入光标
+- 鼠标 3 秒不动后自动回到全屏
+- 全屏画面保持完整，同时底部固定保留 `500px` 空白
 - 放大时支持上下跟随，避免屏幕底部录不到
 - 鼠标样式、点击反馈、圆角遮罩、纯色背景卡片
+- 圆角改为源级遮罩，避免全屏时上方被 Frame 层遮挡
 - 安装时自动开启 `HideOBSWindowsFromCapture=true`，避免 OBS 套 OBS 乱码
 
 ## 安装方法
@@ -30,9 +33,18 @@
 - 可以在脚本设置里调：
   - `Auto Click Zoom Scale`
   - `Typing Zoom Scale`
-  - `Auto Click Reset Delay`
+  - `Mouse Idle Fullscreen Delay`
+  - `Fixed Bottom Blank Space`
+  - `Capture Vertical Anchor`
   - `Smooth Zoom Duration`
   - `Recording Aspect Preset`
+
+## 当前默认值
+
+- `Mouse Idle Fullscreen Delay`：`3000 ms`
+- `Fixed Bottom Blank Space`：`500 px`
+- `Capture Vertical Anchor`：`0.42`
+- `Exclude Windows taskbar from screen capture`：默认关闭，避免全屏画面被裁切
 
 ## 卸载
 

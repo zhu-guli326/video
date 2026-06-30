@@ -10,8 +10,11 @@ background cards, and high-quality OBS recording defaults.
 - High quality recording profile: 60 FPS, Lanczos scaling, high bitrate NVENC defaults
 - Click zoom: defaults to `2.0x`
 - Typing zoom: defaults to `2.6x` and follows the text caret
+- Mouse idle reset: returns to fullscreen after 3 seconds without pointer movement
+- Fullscreen capture keeps the whole screen visible, with a fixed 500 px lower blank area
 - Vertical-aware zoom panning so the bottom of the screen is not cropped out
 - Cursor overlay, click feedback, rounded screen mask, and solid background card
+- Source-level rounded masking avoids top overlay occlusion in fullscreen
 - Installer enables `HideOBSWindowsFromCapture=true` to avoid OBS-in-OBS recursion
 
 ## Install
@@ -32,9 +35,18 @@ background cards, and high-quality OBS recording defaults.
 - Use the script settings to tune:
   - `Auto Click Zoom Scale`
   - `Typing Zoom Scale`
-  - `Auto Click Reset Delay`
+  - `Mouse Idle Fullscreen Delay`
+  - `Fixed Bottom Blank Space`
+  - `Capture Vertical Anchor`
   - `Smooth Zoom Duration`
   - `Recording Aspect Preset`
+
+## Current Defaults
+
+- `Mouse Idle Fullscreen Delay`: `3000 ms`
+- `Fixed Bottom Blank Space`: `500 px`
+- `Capture Vertical Anchor`: `0.42`
+- `Exclude Windows taskbar from screen capture`: off by default, so fullscreen capture is not cropped
 
 ## Uninstall
 

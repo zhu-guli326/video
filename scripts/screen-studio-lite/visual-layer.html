@@ -138,7 +138,7 @@
     }
 
     body[data-mode="frame"] .frame-matte {
-      display: block;
+      display: none;
     }
 
     body[data-mode="cursor"] .stage {
@@ -346,6 +346,7 @@
     const shadow = Math.min(0.8, Math.max(0, Number(params.get("shadow") || 34) / 100));
     const frameMargin = Math.max(0, Number(params.get("frameMargin") || 96));
     const frameRadius = Math.max(0, Number(params.get("frameRadius") || cardRadius));
+    const fixedBottomBlank = Math.max(0, Number(params.get("fixedBottomBlank") || 0));
     const frameScreen = params.get("frameScreen") !== "0";
     const resetDelayMs = Math.max(0, Number(params.get("resetDelay") || 4200));
     const excludeTaskbar = params.get("excludeTaskbar") !== "0";
@@ -446,9 +447,10 @@
     }
 
     function fittedScreenRect(width, height) {
-      const margin = Math.min(frameMargin, width / 2 - 1, height / 2 - 1);
+      const layoutHeight = Math.max(64, height - Math.min(fixedBottomBlank, Math.max(0, height - 64)));
+      const margin = Math.min(frameMargin, width / 2 - 1, layoutHeight / 2 - 1);
       const maxWidth = Math.max(1, width - margin * 2);
-      const maxHeight = Math.max(1, height - margin * 2);
+      const maxHeight = Math.max(1, layoutHeight - margin * 2);
       const aspect = frameScreen ? frameAspectFromState(latestFrameState) : maxWidth / maxHeight;
       let rectWidth = maxWidth;
       let rectHeight = rectWidth / aspect;
@@ -460,7 +462,7 @@
 
       return {
         x: (width - rectWidth) * 0.5,
-        y: (height - rectHeight) * 0.5,
+        y: layoutHeight - rectHeight,
         width: rectWidth,
         height: rectHeight
       };
